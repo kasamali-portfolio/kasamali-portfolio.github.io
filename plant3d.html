@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cement Plant 3D Model · Kasam Ali</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light;--bg:#e9ebed;--ink:#15191c;--blue:#00A0DC;--dim:#5d666d;--line:rgba(21,25,28,.12);--card:rgba(255,255,255,.9)}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:16px/1.5 Poppins,system-ui,sans-serif;overflow:hidden}
+#stage{position:fixed;inset:0;background:radial-gradient(ellipse at 45% 40%,#f7f8f9 0%,#e4e7ea 55%,#cfd4d8 100%)}
+#stage canvas{display:block;width:100%;height:100%;cursor:grab}
+#stage canvas:active{cursor:grabbing}
+#labels{position:fixed;inset:0;pointer-events:none}
+.tag{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;display:flex;flex-direction:column;align-items:center;background:none;border:0;padding:0;color:var(--ink);font:inherit;cursor:pointer}
+.tag .n{width:34px;height:34px;border-radius:50%;border:2px solid var(--blue);background:#fff;display:grid;place-items:center;font-weight:600;font-size:13px;transition:background .2s;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.tag .t{order:-1;margin-bottom:4px;font-size:12px;font-weight:600;white-space:nowrap;background:#fff;padding:3px 9px;border-radius:4px;border-top:3px solid var(--blue);box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.tag .stem{width:2px;height:16px;background:var(--blue)}
+.tag.on .n,.tag:hover .n{background:var(--blue);color:#fff}
+.tag:focus-visible{outline:2px solid var(--blue);outline-offset:4px;border-radius:6px}
+header{position:fixed;left:24px;top:20px;pointer-events:none;max-width:min(520px,60vw)}
+header h1{margin:0;font-size:clamp(20px,2.8vw,32px);line-height:1.05;font-weight:700;letter-spacing:-.01em}
+header p{margin:6px 0 0;color:var(--dim);font-size:13.5px}
+header a{pointer-events:auto;display:inline-block;margin-bottom:8px;font-size:13px;font-weight:600;color:#ff6a1a;text-decoration:none}
+aside{position:fixed;right:20px;top:20px;bottom:20px;width:320px;background:var(--card);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:10px;padding:20px 20px 16px;display:flex;flex-direction:column;overflow:auto;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+aside .num{font-size:13px;color:var(--blue);font-weight:600}
+aside h2{margin:2px 0 12px;font-size:24px;line-height:1.1;font-weight:700}
+aside ul{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+aside li{display:flex;gap:12px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--line);font-size:14.5px;cursor:default}
+aside li i{flex:none;width:10px;height:10px;border-radius:50%;background:var(--blue)}
+aside li:hover{background:rgba(0,160,220,.08)}
+aside .mount{margin-top:auto;padding-top:14px;font-size:13px;color:var(--dim);border-top:1px solid var(--line)}
+aside .mount b{color:var(--ink);font-weight:600}
+nav{position:fixed;left:24px;bottom:20px;display:flex;gap:8px;flex-wrap:wrap;max-width:calc(100% - 390px)}
+nav button{min-height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:#fff;color:var(--ink);font:500 13px Poppins,sans-serif;cursor:pointer}
+nav button:hover,nav button.on{border-color:var(--blue);background:var(--blue);color:#fff}
+nav button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+@media(max-width:900px){nav{display:none}}
+@media(max-width:760px){
+ header{max-width:calc(100% - 40px)}
+ aside{left:10px;right:10px;top:auto;bottom:10px;width:auto;max-height:40vh;padding:14px}
+ aside h2{font-size:20px}
+ .tag .t{display:none}
+}
+@media(prefers-reduced-motion:reduce){.tag .n{transition:none}}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="labels"></div>
+<header>
+  <a href="index.html#plant3d" id="back" target="_top">← Back to portfolio</a>
+  <h1>Where VIBit sits in a cement plant</h1>
+  <p>Interactive 3D model built for MachineAstro. Drag to rotate, scroll to zoom, click a number. Double-click resets.</p>
+</header>
+<aside id="panel" aria-live="polite"></aside>
+<nav id="nav" aria-label="Plant sections"></nav>
+
+<script src="js/three.min.js"></script>
+<script>
+{
+if(window.self!==window.top)document.querySelector('header').style.display='none';
+const S=[
+ {n:'01',name:'Raw Material Handling',at:[0.5,0,-10.5],eq:['Crusher drive motor','Crusher gearbox','Belt conveyor drive','Conveyor rollers']},
+ {n:'02',name:'Raw Mill Section',at:[3,0,-3],eq:['Mill drive motor','Speed reducer (gearbox)','Separator','Raw mill exhaust fan']},
+ {n:'03',name:'Pyro Section',at:[-8,0,-4],eq:['Kiln main drive motor','Gear unit','Pinion & girth gear','Preheater exhaust / kiln ID fan','Clinker cooler fans','Cooler ID fan']},
+ {n:'04',name:'Silo',at:[-11.5,0,5],eq:['Bucket elevator','Bag filter fan (radial)','Fan drive motor']},
+ {n:'05',name:'Cement Mill',at:[-4.5,0,5.6],eq:['Mill main drive motor','Mill gearbox','Separator','Mill vent fan']},
+ {n:'06',name:'Roller Press',at:[0.8,0,9.8],eq:['Roller drive motors','Roller gearboxes','Bucket elevator']},
+ {n:'07',name:'Packaging Plant',at:[10,0,6.2],eq:['Rotary packer','Bucket elevator','Vibrating screen']},
+ {n:'08',name:'Powerplant',at:[14,0,-10],eq:['Boiler Feed Pump','PA Fan','SA Fan','ID Fan','CEP Pump','Vacuum Pump','Cooling Water Pump','Demineralization Pump','Gas Turbine','Cooling Tower Fan']}
+];
+
+const stage=document.getElementById('stage');
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
+stage.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+const cam=new THREE.PerspectiveCamera(38,1,0.1,400);
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const PI=Math.PI;
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x6c737a,0.55));
+const sun=new THREE.DirectionalLight(0xffffff,1.7);sun.position.set(-16,30,18);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:90});sun.shadow.bias=-0.0006;sun.shadow.normalBias=0.02;
+scene.add(sun);
+const fill=new THREE.DirectionalLight(0xdfe8ef,0.35);fill.position.set(20,12,-14);scene.add(fill);
+
+const lin=c=>new THREE.Color(c).convertSRGBToLinear();
+const clay=(c,r=.82,m=.04)=>new THREE.MeshStandardMaterial({color:lin(c),roughness:r,metalness:m,side:THREE.DoubleSide});
+const plant=new THREE.Group();scene.add(plant);
+const G=S.map(()=>{const g=new THREE.Group();plant.add(g);return g});
+const MAT=S.map(()=>[clay(0xd6cfc3),clay(0x7f888f),clay(0xbcc3c8,.45,.35),clay(0xf0b429,.7),clay(0xc63f2c),clay(0x4d7a62,.7,.1),clay(0xe0692a,.6)]);
+const BASE=[clay(0xc4c7c9),clay(0x8d9499),clay(0x9fa6aa,.9),clay(0xf0b429,.7)];
+const SP=S.map(()=>[]);
+let cg=0,ctn=null,useBase=false;
+const par=()=>ctn||G[cg];
+function put(geo,x,y,z,k=0,rx=0,ry=0,rz=0){const m=new THREE.Mesh(geo,(useBase?BASE:MAT[cg])[k]);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);par().add(m);return m}
+const box=(w,h,d,x,y,z,k=0)=>put(new THREE.BoxGeometry(w,h,d),x,y+h/2,z,k);
+const cyl=(rt,rb,h,x,y,z,k=0,seg=32)=>put(new THREE.CylinderGeometry(rt,rb,h,seg),x,y+h/2,z,k);
+const hx=(r,len,x,y,z,k=2)=>put(new THREE.CylinderGeometry(r,r,len,28),x,y,z,k,0,0,PI/2);
+const hz=(r,len,x,y,z,k=2)=>put(new THREE.CylinderGeometry(r,r,len,28),x,y,z,k,PI/2,0,0);
+const tX=(R,t,x,y,z,k=1)=>put(new THREE.TorusGeometry(R,t,8,40),x,y,z,k,0,PI/2,0);
+const tY=(R,t,x,y,z,k=1)=>put(new THREE.TorusGeometry(R,t,8,40),x,y,z,k,PI/2,0,0);
+const tZ=(R,t,x,y,z,k=1)=>put(new THREE.TorusGeometry(R,t,8,40),x,y,z,k);
+const sensor=(x,y,z)=>SP[cg].push([x,y,z]);
+function inside(x,y,z,ry,fn){const g=new THREE.Group();g.position.set(x,y,z);g.rotation.y=ry||0;par().add(g);const o=ctn;ctn=g;fn();ctn=o;return g}
+function beam(a,b,r=.05,k=1,seg=6){const A=V(...a),B=V(...b),d=B.clone().sub(A),L=d.length();
+  const m=put(new THREE.CylinderGeometry(r,r,L,seg),0,0,0,k);m.position.copy(A).add(B).multiplyScalar(.5);
+  m.quaternion.setFromUnitVectors(V(0,1,0),d.normalize());return m}
+function ribbed(r,h,x,y,z,n=4,k=0){cyl(r,r,h,x,y,z,k);for(let i=1;i<=n;i++)tY(r+.03,.045,x,y+h*i/(n+1),z);tY(r+.02,.07,x,y+h,z);tY(r+.02,.07,x,y+.04,z)}
+function frame(w,d,h,x,z,lv){const xs=[x-w/2,x+w/2],zs=[z-d/2,z+d/2];
+  for(const a of xs)for(const b of zs)box(.2,h,.2,a,0,b,1);
+  for(let i=1;i<=lv;i++){const y=h*i/lv;box(w,.14,d,x,y-.14,z,0);
+    for(const b of zs){beam([xs[0],y-h/lv,b],[xs[1],y,b],.04);beam([xs[1],y-h/lv,b],[xs[0],y,b],.04)}
+    for(const a of xs){beam([a,y-h/lv,zs[0]],[a,y,zs[1]],.04);beam([a,y-h/lv,zs[1]],[a,y,zs[0]],.04)}}}
+function pipe(pts,r=.28){for(let i=0;i<pts.length-1;i++){const A=V(...pts[i]),B=V(...pts[i+1]),d=B.clone().sub(A).normalize();
+  beam(pts[i],pts[i+1],r,2,20);
+  for(const P of [A.clone().addScaledVector(d,r*1.6),B.clone().addScaledVector(d,-r*1.6)]){const f=put(new THREE.TorusGeometry(r+.04,.06,8,24),P.x,P.y,P.z,1);f.quaternion.setFromUnitVectors(V(0,0,1),d)}}
+  for(let i=1;i<pts.length-1;i++)put(new THREE.SphereGeometry(r*1.12,20,14),...pts[i],2)}
+function pier(x,z,top){box(.8,top,1.1,x,0,z,1)}
+function ladder(x,y,z,h,ry){inside(x,y,z,ry,()=>{box(.05,h,.05,-.2,0,0,3);box(.05,h,.05,.2,0,0,3);for(let v=.25;v<h;v+=.3)box(.4,.035,.035,0,v,0,3)})}
+function railRing(r,x,y,z){for(let i=0;i<16;i++){const a=i/16*PI*2;box(.045,.5,.045,x+Math.cos(a)*r,y,z+Math.sin(a)*r,3)}tY(r,.035,x,y+.5,z,3)}
+function motor(x,y,z,ry,len=1.3,r=.4){inside(x,y,z,ry,()=>{const c=r+.14;box(len*.85,.14,r*1.7,0,0,0,1);hx(r,len,0,c,0,5);
+  for(let i=0;i<6;i++)tX(r+.015,.03,-len/2+.2+i*(len-.4)/5,c,0,5);hx(r*.85,.18,-len/2-.08,c,0,1);hx(.08,.35,len/2+.15,c,0,2);box(.35,.28,.35,0,c+r-.05,0,5)})}
+function gearbox(x,y,z,w=1,h=.9,d=1.1){box(w,h,d,x,y,z,5);box(w*1.08,.08,d*1.08,x,y+h*.55,z,1);box(w*.4,.25,d*.5,x,y+h,z,1)}
+function fan(x,y,z,ry,r=.9){inside(x,y,z,ry,()=>{box(r*1.6,.25,1.2,0,0,0,1);hz(r,.7,0,r+.3,0,5);tZ(r,.05,0,r+.3,.36,1);tZ(r,.05,0,r+.3,-.36,1);
+  box(r*.9,r*1.3,.7,r*.55,r+.3,0,5);hz(.42,.3,0,r+.3,.5,1);for(let i=-2;i<=2;i++)box(.7,.03,.04,0,r+.3+i*.12,.66,1);
+  motor(0,0,-1.35,PI/2,1,.32)})}
+function gallery(a,b){const A=V(...a),B=V(...b),L=A.distanceTo(B);
+  const g=inside(a[0],a[1],a[2],0,()=>{});g.lookAt(B);const o=ctn;ctn=g;
+  box(1.1,.12,L,0,-.06,L/2,1);box(.05,.05,L,-.55,.6,L/2,3);box(.05,.05,L,.55,.6,L/2,3);
+  for(let t=0;t<=L;t+=.9){box(.05,.6,.05,-.55,0,t,3);box(.05,.6,.05,.55,0,t,3)}
+  box(.7,.08,L,0,.08,L/2,6);ctn=o;
+  for(let t=.15;t<.95;t+=.27){const P=A.clone().lerp(B,t);box(.22,P.y-.1,.22,P.x,0,P.z,1)}}
+function pump(x,z,ry){inside(x,0,z,ry,()=>{box(2.2,.3,.9,0,0,0,1);motor(-.5,.3,0,0,1,.3);cyl(.38,.38,.35,.55,.42,0,4);hx(.15,.5,.55,.95,0,2)})}
+
+/* base plate */
+useBase=true;cg=0;
+box(46,.8,38,0,-.8,0,0);
+{const tg=new THREE.BoxGeometry(1.86,.08,1.86),im=new THREE.InstancedMesh(tg,BASE[2],23*19),d=new THREE.Object3D();let n=0;
+ for(let i=0;i<23;i++)for(let j=0;j<19;j++){d.position.set(-22+i*2,.04,-18+j*2);d.updateMatrix();im.setMatrixAt(n++,d.matrix)}
+ im.receiveShadow=true;scene.add(im);}
+const wall=(x0,z0,x1,z1)=>{const L=Math.hypot(x1-x0,z1-z0),ry=Math.atan2(z1-z0,x1-x0);
+  inside(x0,0,z0,-ry,()=>{box(L,3.2,.35,L/2,0,0,0);box(L,.25,.55,L/2,3.2,0,1);
+   for(let t=0;t<=L+.01;t+=3.2){box(.35,3.4,.6,t,0,.05,1);if(t<L-1){beam([t+.3,.3,.22],[t+2.9,2.9,.22],.08,1);beam([t+.3,2.9,.22],[t+2.9,.3,.22],.08,1)}}})};
+wall(-23,-19,23,-19);wall(-23,19,-23,-19);
+for(const z of [-.1,2.1])box(42,.02,.14,0,.08,z,3);for(const x of [-21,21])box(.14,.02,36,x,.08,0,3);
+useBase=false;
+
+/* 01 Raw material handling */
+cg=0;
+box(2.6,1.8,2.2,0,0,-11);for(let i=-1;i<=1;i++)box(.08,1.8,2.3,i*.9,0,-11,1);
+put(new THREE.CylinderGeometry(1.5,.75,1.3,4),0,2.45,-11,0,0,PI/4,0);
+motor(2.1,0,-11.2,0);gearbox(2.1,0,-10.1,.8,.7,.8);
+put(new THREE.ConeGeometry(2.4,2,40),-3.6,1,-12.5,1);
+gallery([1.5,1.6,-9.2],[3.8,5,-4.2]);
+sensor(2.6,.85,-11.2);sensor(2.1,.85,-10.1);sensor(1.6,1.9,-8.9);sensor(-1.3,.5,-11);
+
+/* 02 Raw mill */
+cg=1;
+gearbox(3,0,-3,2.2,.7,2.2);ribbed(1.3,2.2,3,.7,-3,3);
+cyl(.65,1.3,1,3,2.9,-3);cyl(.55,.55,1,3,3.9,-3,2);box(.5,.4,.5,3,4.9,-3,1);railRing(1.25,3,2.9,-3);
+motor(5.2,0,-3,0,1.6,.45);ladder(1.62,.7,-3,2.2,PI/2);
+fan(5,0,.4,0);
+for(const x of [6.4,8.4]){ribbed(.95,4.8,x,0,-7,5);cyl(.95,.4,.6,x,4.8,-7);railRing(.9,x,4.8,-7);ladder(x+1.02,0,-7,4.8,PI/2)}
+sensor(4.4,.95,-3);sensor(3,.75,-1.85);sensor(3,4.4,-2.4);sensor(5,1.2,.45+.4);
+
+/* 03 Pyro */
+cg=2;
+frame(3,3,10.5,-6.5,-6.5,5);
+for(let i=0;i<4;i++){const x=i%2?-7.1:-5.9,y=2.4+i*2.1;cyl(.5,.5,.8,x,y+.9,-6.5,2);cyl(.12,.5,.9,x,y,-6.5,2)}
+cyl(.3,.3,2.5,-6.5,10.5,-6.5,2);for(const y of [11.2,12.2])tY(.33,.06,-6.5,y,-6.5);
+fan(-3.2,0,-8.4,PI);
+{const A=V(-7.8,1.9,-4.3),B=V(-16.5,1.1,-.4),L=A.distanceTo(B),r=.85;
+ const g=inside(A.x,A.y,A.z,0,()=>{});g.lookAt(B);const o=ctn;ctn=g;
+ put(new THREE.CylinderGeometry(r,r,L,36),0,0,L/2,2,PI/2,0,0);
+ for(const t of [.18,.5,.82])tZ(r+.12,.13,0,0,L*t,1);tZ(r+.4,.09,0,0,L*.62,1);
+ for(let t=.05;t<.97;t+=.07)tZ(r+.01,.025,0,0,L*t,1);ctn=o;
+ for(const t of [.18,.5,.82]){const P=A.clone().lerp(B,t);pier(P.x,P.z,P.y-r-.12)}
+ const P=A.clone().lerp(B,.62),d=B.clone().sub(A).setY(0).normalize(),pp=V(d.z,0,-d.x);
+ const Q=P.clone().addScaledVector(pp,2.1);gearbox(Q.x,0,Q.z,1,.9,1.1);motor(Q.x+pp.x*1.2,0,Q.z+pp.z*1.2,Math.atan2(-pp.z,pp.x),1.3,.42);
+ sensor(Q.x+pp.x*1.2,1,Q.z+pp.z*1.2);sensor(Q.x,1,Q.z);sensor(P.x+pp.x*1.3,P.y,P.z+pp.z*1.3);}
+box(3.4,1.9,2.6,-18.2,0,.6);for(let i=0;i<4;i++)box(.08,1.9,2.7,-19.6+i*.95,0,.6,1);
+for(let i=0;i<3;i++)fan(-19.4+i*1.4,0,3.3,0,.5);
+fan(-17.6,0,-2.3,PI,.65);
+sensor(-3.2,1.3,-8.85);sensor(-18,1.1,3.85);sensor(-17.6,1,-2.85);
+
+/* 04 Silo */
+cg=3;
+ribbed(2.2,4,-11.5,0,5,4);put(new THREE.SphereGeometry(2.2,36,12,0,PI*2,0,PI/2),-11.5,4,5,0);
+railRing(1.2,-11.5,6.15,5);cyl(.5,.5,.3,-11.5,6.15,5,1);ladder(-9.22,0,5,4,PI/2);
+box(.8,7.6,.8,-14.3,0,2.4,0);box(1.2,1,1.2,-14.3,7.6,2.4,1);for(let y=1;y<7.5;y+=1.5)box(.86,.08,.86,-14.3,y,2.4,1);
+beam([-13.8,8,2.4],[-11.5,6.4,5],.16,2,12);
+for(const [a,b] of [[-.6,-.5],[.6,-.5],[-.6,.5],[.6,.5]])box(.12,1.6,.12,-11.5+a,0,9.2+b,1);
+box(1.6,1.9,1.2,-11.5,1.6,9.2,0);put(new THREE.CylinderGeometry(.8,.2,.7,4),-11.5,1.25,9.2,1,0,PI/4,0);
+fan(-9,0,9.2,-PI/2,.55);
+sensor(-14.3,8.1,3.05);sensor(-9,.95,9.75);sensor(-9,.6,10.6);
+
+/* 05 Cement mill */
+cg=4;
+{const y=1.6;hx(1,5,-4.5,y,5.6,2);for(const s of [-1,1])put(new THREE.SphereGeometry(1,24,16),-4.5+s*2.5,y,5.6,2).scale.set(.35,1,1);
+ for(let i=0;i<6;i++)tX(1.02,.04,-6.5+i*.8,y,5.6);tX(1.35,.1,-3,y,5.6);
+ pier(-7.6,5.6,y-.4);pier(-1.4,5.6,y-.4);hx(.3,.6,-7.6,y,5.6,1);hx(.3,.6,-1.4,y,5.6,1);}
+gearbox(-3,0,7.3,1,.9,1);motor(-3,0,8.7,PI/2,1.2,.4);
+box(1.6,2.2,1.6,-6.8,0,2.8,1);cyl(.75,.75,1,-6.8,2.2,2.8,2);cyl(.75,.3,.6,-6.8,3.2,2.8,2);
+fan(-4,0,2.6,0,.6);
+sensor(-3,1.2,8.7);sensor(-3,1.05,7.9);sensor(-6.8,3,3.6);sensor(-4,1.1,3.15);
+
+/* 06 Roller press */
+cg=5;
+box(3.2,.5,2.4,.5,0,9.6,1);for(const x of [-.9,1.9])box(.4,2.4,2.4,x,.5,9.6,1);box(3.2,.35,2.4,.5,2.9,9.6,1);
+hz(.65,2.4,-.1,1.6,9.6,2);hz(.65,2.4,1.1,1.6,9.6,2);hx(.22,.9,-1.55,1.6,9.6,1);hx(.22,.9,2.55,1.6,9.6,1);
+motor(-.2,0,12.3,PI/2,1.2,.38);motor(1.2,0,12.3,PI/2,1.2,.38);
+box(.75,6,.75,3.8,0,9.6,0);box(1.1,.9,1.1,3.8,6,9.6,1);beam([4.2,6.5,9.6],[6.3,5.4,7],.13,2,12);
+sensor(-.2,.95,11.6);sensor(-.1,2.5,9.6);sensor(3.8,6.95,9.6);
+
+/* 07 Packaging */
+cg=6;
+box(2.4,6.6,2.4,9,0,6.2,0);for(let y=1.3;y<6.6;y+=1.3)box(2.5,.1,2.5,9,y,6.2,1);box(1.6,.6,1.1,9,6.6,6.2,1);
+railRing(1.4,9,6.6,6.2);
+for(const z of [3.4,9])ribbed(1,4.6,11.6,0,z,4);
+box(5,2.6,3.6,16,0,6.2,0);put(new THREE.CylinderGeometry(2.1,2.1,5.2,3),16,3.05,6.2,0,0,0,PI/2).scale.set(1,1,.9);
+cyl(.85,.85,.9,9,0,8.6,2);cyl(.2,.2,.5,9,.9,8.6,1);
+inside(16,0,10.5,0,()=>{box(1.5,1.4,1.7,-2.4,0,0,6);hx(.75,3,.2,1.25,0,2);box(4.6,.3,1.5,-.4,.2,0,1);for(const x of [-2.4,-.6,1.2])hz(.35,1.8,x,.35,0,1)});
+sensor(9,1.1,9.4);sensor(9,4,7.45);sensor(9,7.3,6.8);
+
+/* 08 Powerplant */
+cg=7;
+box(4,5.2,3.2,13,0,-11.2,0);for(let i=0;i<5;i++)box(.08,5.2,3.3,11.4+i*.8,0,-11.2,1);box(4.2,.3,3.4,13,5.2,-11.2,1);
+for(const x of [10.4,11.8]){cyl(.42,.55,10.5,x,0,-15.2,0);for(const y of [7.6,8.3,9])cyl(.47,.47,.35,x,y,-15.2,4);tY(.45,.1,x,10.3,-15.2,1)}
+{const p=[];for(let i=0;i<=14;i++){const y=i/14*5.4,u=(y-3.6)/3.6;p.push(new THREE.Vector2(1.55+.9*u*u,y))}
+ put(new THREE.LatheGeometry(p,40),19,0,-13.5,0);railRing(1.6,19,5.4,-13.5);}
+box(4.8,.6,1.8,17,0,-7.4,1);hx(.65,1.8,15.9,1.25,-7.4,2);put(new THREE.CylinderGeometry(.65,.9,.8,28),17.2,1.25,-7.4,2,0,0,PI/2);hx(.8,1.4,18.6,1.45,-7.4,2);
+for(let i=0;i<4;i++)pump(11.4+i*2.5,-6.2,0);
+fan(9.6,0,-9.4,-PI/2,.7);fan(9.6,0,-12.2,-PI/2,.7);fan(15.6,0,-10.2,PI/2,.7);
+pump(20.5,-9.8,PI/2);
+sensor(10.9,.75,-6.2);sensor(9.05,1.3,-9.4);sensor(9.05,1.3,-12.2);sensor(16.15,1.3,-10.2);sensor(13.4,.75,-6.2);
+sensor(15.9,.75,-6.2);sensor(18.4,.75,-6.2);sensor(20.5,.75,-10.3);sensor(17.2,2.2,-7.4);sensor(19,5.9,-13.5);
+
+/* pipe rack */
+cg=7;
+pipe([[13,3.2,-8],[13,3.2,1],[6.5,3.2,1],[6.5,.35,1]],.26);
+for(const [x,z] of [[13,-5],[13,-2],[11,1],[8.5,1]]){box(.18,3.2,.18,x,0,z,1);box(1,.12,.35,x,3,z,1)}
+
+plant.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
+
+/* sensors */
+const dotG=new THREE.SphereGeometry(.16,16,12),ringG=new THREE.RingGeometry(.24,.31,32);
+const sensors=[];
+SP.forEach((pts,gi)=>pts.forEach((p,k)=>{
+  const d=new THREE.Mesh(dotG,new THREE.MeshBasicMaterial({color:lin(0x00A0DC)}));
+  const rg=new THREE.Mesh(ringG,new THREE.MeshBasicMaterial({color:lin(0x00A0DC),transparent:true,side:THREE.DoubleSide,depthWrite:false}));
+  d.position.set(...p);rg.position.set(...p);scene.add(d,rg);sensors.push({d,rg,gi,k,ph:Math.random()*6});
+}));
+
+/* camera orbit */
+let th=.62,ph=.98,rad=58,tgt=V(0,1,-1);
+let goal={th,ph,rad,tgt:tgt.clone()},idle=0;
+const el=renderer.domElement;let drag=null,pinch=0;
+el.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};el.setPointerCapture(e.pointerId);idle=0});
+el.addEventListener('pointermove',e=>{if(!drag)return;goal.th-=(e.clientX-drag.x)*.006;goal.ph=Math.min(1.45,Math.max(.25,goal.ph-(e.clientY-drag.y)*.005));drag={x:e.clientX,y:e.clientY};idle=0});
+el.addEventListener('pointerup',()=>drag=null);
+el.addEventListener('wheel',e=>{e.preventDefault();goal.rad=Math.min(95,Math.max(10,goal.rad*(1+e.deltaY*.001)));idle=0},{passive:false});
+el.addEventListener('touchmove',e=>{if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(pinch)goal.rad=Math.min(95,Math.max(10,goal.rad*pinch/d));pinch=d;drag=null}},{passive:true});
+el.addEventListener('touchend',()=>pinch=0);
+el.addEventListener('dblclick',()=>{goal={th:.62,ph:.98,rad:58,tgt:V(0,1,-1)};sel=-1;render()});
+
+/* UI */
+const labels=document.getElementById('labels'),panel=document.getElementById('panel'),nav=document.getElementById('nav');
+const tagTop=[4.2,6,11.2,8.8,3.6,3.6,8,11.5];
+labels.innerHTML=S.map((s,i)=>`<button class="tag" data-i="${i}" aria-label="${s.n} ${s.name}"><span class="t">${s.name}</span><span class="n">${s.n}</span><span class="stem"></span></button>`).join('');
+nav.innerHTML=`<button data-i="-1">Whole plant</button>`+S.map((s,i)=>`<button data-i="${i}">${s.n} ${s.name}</button>`).join('');
+const tags=[...labels.children];
+let sel=-1,hov=-1;
+function pick(i){
+  sel=i;idle=0;
+  if(i<0)goal={th:goal.th,ph:.98,rad:58,tgt:V(0,1,-1)};
+  else{const a=S[i].at;goal.tgt=V(a[0],Math.max(2,tagTop[i]*.3),a[2]);goal.rad=window.innerWidth<760?34:(i===2||i===7?32:25);goal.ph=.95}
+  render();
+}
+const mount=`<p class="mount">Typical VIBit mounting: <b>Motor DE / NDE</b> and <b>Fan or Pump DE / NDE</b>.</p>`;
+function render(){
+  tags.forEach((t,i)=>t.classList.toggle('on',i===sel));
+  [...nav.children].forEach(b=>b.classList.toggle('on',+b.dataset.i===sel));
+  if(sel<0){
+    panel.innerHTML=`<span class="num">Whole plant</span><h2>8 plant sections, one sensor network</h2>
+    <ul>${S.map((s,i)=>`<li data-i="${i}" style="cursor:pointer"><i></i>${s.n} · ${s.name} <span style="margin-left:auto;color:var(--dim)">${s.eq.length}</span></li>`).join('')}</ul>`+mount;
+    panel.querySelectorAll('li').forEach(li=>li.onclick=()=>pick(+li.dataset.i));
+  }else{
+    const s=S[sel];
+    panel.innerHTML=`<span class="num">Section ${s.n}</span><h2>${s.name}</h2>
+    <ul>${s.eq.map((e,k)=>`<li data-k="${k}"><i></i>${e}</li>`).join('')}</ul>`+mount;
+    panel.querySelectorAll('li').forEach(li=>{li.onmouseenter=()=>hov=+li.dataset.k;li.onmouseleave=()=>hov=-1});
+  }
+}
+labels.addEventListener('click',e=>{const b=e.target.closest('.tag');if(b)pick(+b.dataset.i)});
+nav.addEventListener('click',e=>{const b=e.target.closest('button');if(b)pick(+b.dataset.i)});
+addEventListener('keydown',e=>{if(e.key==='Escape')pick(-1);if(e.key==='ArrowRight')pick((sel+1)%8);if(e.key==='ArrowLeft')pick((sel+7)%8)});
+render();
+
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);cam.aspect=w/h;if(w>760)cam.setViewOffset(w,h,170,0,w,h);else cam.setViewOffset(w,h,0,h*.18,w,h);cam.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();
+
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clock=new THREE.Clock(),tmp=V(0,0,0);
+function loop(){
+  const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+  idle+=dt;
+  if(!reduce&&idle>4&&!drag)goal.th+=dt*.06;
+  th+=(goal.th-th)*.08;ph+=(goal.ph-ph)*.08;rad+=(goal.rad-rad)*.08;tgt.lerp(goal.tgt,.08);
+  cam.position.set(tgt.x+rad*Math.sin(ph)*Math.sin(th),tgt.y+rad*Math.cos(ph),tgt.z+rad*Math.sin(ph)*Math.cos(th));
+  cam.lookAt(tgt);
+  MAT.forEach((ms,i)=>ms.forEach(m=>m.emissive.setHex(sel===i?0x02121e:0)));
+  sensors.forEach(s=>{const on=sel<0||sel===s.gi;const hi=sel===s.gi&&hov>=0&&(hov%SP[s.gi].length)===s.k;
+    s.d.visible=on;s.rg.visible=on;const p=reduce?.5:((t*.8+s.ph)%1);
+    s.rg.scale.setScalar(hi?2.4:1+p*1.6);s.rg.material.opacity=hi?1:(1-p)*.9;s.rg.lookAt(cam.position);
+    s.d.material.color.copy(hi?lin(0x0b4f7a):lin(0x00A0DC));s.d.scale.setScalar(hi?1.7:1)});
+  renderer.render(scene,cam);
+  const w=innerWidth,h=innerHeight;
+  tags.forEach((tg,i)=>{tmp.set(S[i].at[0],tagTop[i],S[i].at[2]).project(cam);
+    tg.style.display=tmp.z<1?'':'none';
+    tg.style.left=((tmp.x+1)/2*w)+'px';tg.style.top=((1-tmp.y)/2*h)+'px';
+    tg.style.opacity=sel<0||sel===i?1:.45;tg.style.zIndex=Math.round((1-tmp.z)*1000)});
+  requestAnimationFrame(loop);
+}
+loop();
+}
+</script>
+</body>
+</html>
